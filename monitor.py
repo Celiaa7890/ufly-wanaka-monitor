@@ -68,9 +68,18 @@ def fetch_slots(day: str) -> list[dict[str, str]]:
             )
             with urllib.request.urlopen(request, timeout=20) as response:
                 body = response.read()
+                content_type = response.headers.get("Content-Type", "unknown")
+                status = response.status
             if not body.strip():
                 raise RuntimeError(f"{day}: empty response")
-            payload = json.loads(body)
+            try:
+                payload = json.loads(body)
+            except ValueError as error:
+                preview = body[:160].decode("utf-8", errors="replace")
+                raise RuntimeError(
+                    f"{day}: HTTP {status}, {content_type}, non-JSON response: "
+                    f"{preview!r}"
+                ) from error
             if not isinstance(payload, list):
                 raise RuntimeError(f"{day}: unexpected response")
             return [
