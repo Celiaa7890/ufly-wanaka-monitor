@@ -19,7 +19,10 @@ BASE_URL = "https://uflywanaka.simplybook.asia"
 DATES = [f"2026-11-{day:02d}" for day in range(9, 16)]
 STATE_ISSUE_TITLE = "U-Fly monitor state (do not close)"
 WORKFLOW_FILE = "ufly-monitor.yml"
-USER_AGENT = "UFlyAvailabilityMonitor/3.0 (+personal availability checker)"
+USER_AGENT = (
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/142.0 Safari/537.36"
+)
 
 
 def booking_url(day: str) -> str:
@@ -46,11 +49,11 @@ def request_json(url: str, *, method: str = "GET", data=None, headers=None):
         return None if not payload else json.loads(payload)
 
 
-def fetch_slots(day: str) -> list[dict[str, str]]:
+def fetch_slots(start_day: str, end_day: str) -> list[dict[str, str]]:
     query = urllib.parse.urlencode(
         {
-            "from": day,
-            "to": day,
+            "from": start_day,
+            "to": end_day,
             "location": "1",
             "category": "1",
             "provider": "any",
@@ -71,19 +74,20 @@ def fetch_slots(day: str) -> list[dict[str, str]]:
                 content_type = response.headers.get("Content-Type", "unknown")
                 status = response.status
             if not body.strip():
-                raise RuntimeError(f"{day}: empty response")
+                raise RuntimeError(f"{start_day}–{end_day}: empty response")
             try:
                 payload = json.loads(body)
             except ValueError as error:
                 preview = body[:160].decode("utf-8", errors="replace")
                 raise RuntimeError(
-                    f"{day}: HTTP {status}, {content_type}, non-JSON response: "
+                    f"{start_day}–{end_day}: HTTP {status}, {content_type}, "
+                    "non-JSON response: "
                     f"{preview!r}"
                 ) from error
             if not isinstance(payload, list):
-                raise RuntimeError(f"{day}: unexpected response")
+                raise RuntimeError(f"{start_day}–{end_day}: unexpected response")
             return [
-                {"day": item.get("date", day), "time": item["time"]}
+                {"day": item.get("date", start_day), "time": item["time"]}
                 for item in payload
                 if item.get("type") == "free" and item.get("time")
             ]
@@ -95,10 +99,12 @@ def fetch_slots(day: str) -> list[dict[str, str]]:
 
 
 def scan() -> list[dict[str, str]]:
-    slots = []
-    for day in DATES:
-        slots.extend(fetch_slots(day))
-    return sorted(slots, key=lambda slot: (slot["day"], slot["time"]))
+    slots = fetch_slots(DATES[0], DATES[-1])
+    allowed_dates = set(DATES)
+    return sorted(
+        (slot for slot in slots if slot["day"] in allowed_dates),
+        key=lambda slot: (slot["day"], slot["time"]),
+    )
 
 
 def github_headers() -> dict[str, str]:
