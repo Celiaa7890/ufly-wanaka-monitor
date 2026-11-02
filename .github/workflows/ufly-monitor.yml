@@ -2,7 +2,8 @@ name: U-Fly 60 availability monitor
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    # Offset from the top of the hour to reduce GitHub scheduler congestion.
+    - cron: "3-58/5 * * * *"
   workflow_dispatch:
     inputs:
       test_notification:
